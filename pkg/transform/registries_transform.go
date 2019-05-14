@@ -72,7 +72,7 @@ func (e RegistriesExtraction) Transform() (Output, error) {
 
 	imageCRYAML, err := yaml.Marshal(&imageCR)
 	if err != nil {
-		HandleError(err)
+		return nil, err
 	}
 
 	manifest := Manifest{Name: "100_CPMA-cluster-config-registries.yaml", CRD: imageCRYAML}
@@ -84,14 +84,18 @@ func (e RegistriesExtraction) Transform() (Output, error) {
 }
 
 // Extract collects registry information from an OCP3 cluster
-func (e RegistriesTransform) Extract() Extraction {
+func (e RegistriesTransform) Extract() (Extraction, error) {
 	logrus.Info("RegistriesTransform::Extract")
-	content := e.Config.Fetch(e.Config.RegistriesConfigFile)
+	content, err := e.Config.Fetch(e.Config.RegistriesConfigFile)
+	if err != nil {
+		return nil, err
+	}
+
 	var extraction RegistriesExtraction
 	if _, err := toml.Decode(string(content), &extraction); err != nil {
-		HandleError(err)
+		return nil, err
 	}
-	return extraction
+	return extraction, nil
 }
 
 // Validate registry data collected from an OCP3 cluster
@@ -100,4 +104,9 @@ func (e RegistriesExtraction) Validate() error {
 		return errors.New("no configured registries detected, not generating a cr")
 	}
 	return nil
+}
+
+// Type retrurn transform type
+func (e RegistriesTransform) Type() string {
+	return "Registries"
 }
