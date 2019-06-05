@@ -72,8 +72,8 @@ func InitConfig() error {
 	cliPromptMissingValues()
 
 	if err != nil {
-		createConfigFile()
-		logrus.Debug("Can't read config file, all values were prompted and new config was asked to be create, err: ", err)
+		cliCreateConfigFile()
+		logrus.Debug("Can't read config file, all values were prompted and new config was asked to be created, err: ", err)
 	}
 
 	return nil
@@ -148,7 +148,7 @@ func getNestedArgValues() {
 	viperConfig.Set("SSHCreds", sshCreds)
 }
 
-func createConfigFile() {
+func cliCreateConfigFile() {
 	createConfig := ""
 	prompt := &survey.Select{
 		Message: "No config file found, do you wish to create one for future use?",
