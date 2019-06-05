@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/fusor/cpma/pkg/env/clusterdiscovery"
 	"github.com/mitchellh/go-homedir"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -76,6 +77,7 @@ func InitConfig() error {
 		logrus.Debug("Can't read config file, all values were prompted and new config was asked to be created, err: ", err)
 	}
 
+	clusterdiscovery.DiscoverCluster()
 	return nil
 }
 
