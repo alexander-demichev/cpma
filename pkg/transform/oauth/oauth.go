@@ -5,6 +5,7 @@ import (
 
 	"github.com/fusor/cpma/pkg/transform/configmaps"
 	"github.com/fusor/cpma/pkg/transform/secrets"
+	notlegacy "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/api/legacyconfig/v1"
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	"github.com/sirupsen/logrus"
@@ -35,14 +36,22 @@ type CRD struct {
 
 // Spec is a CRD Spec
 type Spec struct {
-	IdentityProviders []interface{}         `yaml:"identityProviders,omitempty"`
-	TokenConfig       TranslatedTokenConfig `yaml:"tokenConfig,omitempty"`
+	IdentityProviders []interface{}            `yaml:"identityProviders,omitempty"`
+	TokenConfig       TranslatedTokenConfig    `yaml:"tokenConfig,omitempty"`
+	Templates         notlegacy.OAuthTemplates `yaml:"templates,omitempty"`
 }
 
 // TranslatedTokenConfig holds lifetime of access tokens
 type TranslatedTokenConfig struct {
 	AccessTokenMaxAgeSeconds int32 `yaml:"accessTokenMaxAgeSeconds"`
 }
+
+// // Templates stores templates that allow to customize the login page
+// type Templates struct {
+// 	Login             string `yaml:"login"`
+// 	Error             string `yaml:"error"`
+// 	ProviderSelection string `yaml:"providerSelection"`
+// }
 
 type identityProviderCommon struct {
 	Name          string `yaml:"name"`
@@ -91,7 +100,7 @@ type Resources struct {
 	ConfigMaps []*configmaps.ConfigMap
 }
 
-// TokenConfig store internal OAuth tokens duration
+// TokenConfig stores internal OAuth tokens duration
 type TokenConfig struct {
 	AuthorizeTokenMaxAgeSeconds int32
 	AccessTokenMaxAgeSeconds    int32
@@ -105,7 +114,7 @@ const (
 )
 
 // Translate converts OCPv3 OAuth to OCPv4 OAuth Custom Resources
-func Translate(identityProviders []IdentityProvider, tokenConfig TokenConfig) (*Resources, error) {
+func Translate(identityProviders []IdentityProvider, tokenConfig TokenConfig, templates configv1.OAuthTemplates) (*Resources, error) {
 	var err error
 	var idP interface{}
 	var secretsSlice []*secrets.Secret
@@ -180,6 +189,15 @@ func Translate(identityProviders []IdentityProvider, tokenConfig TokenConfig) (*
 
 	// Translate lifetime of access tokens
 	oauthCrd.Spec.TokenConfig.AccessTokenMaxAgeSeconds = tokenConfig.AccessTokenMaxAgeSeconds
+
+	// Translate templates that allow to customize the login page
+	translatedTemplates, templateSecrets, err := translateTemplates(templates)
+	if err != nil {
+		return nil, err
+	}
+
+	oauthCrd.Spec.Templates = *translatedTemplates
+	secretsSlice = append(secretsSlice, templateSecrets...)
 
 	return &Resources{
 		OAuthCRD:   &oauthCrd,

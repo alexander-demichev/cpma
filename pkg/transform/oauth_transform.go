@@ -8,6 +8,7 @@ import (
 	"github.com/fusor/cpma/pkg/env"
 	"github.com/fusor/cpma/pkg/io"
 	"github.com/fusor/cpma/pkg/transform/oauth"
+	configv1 "github.com/openshift/api/legacyconfig/v1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,6 +19,7 @@ const OAuthComponentName = "OAuth"
 type OAuthExtraction struct {
 	IdentityProviders []oauth.IdentityProvider
 	TokenConfig       oauth.TokenConfig
+	Templates         configv1.OAuthTemplates
 }
 
 // OAuthTransform is an OAuth specific transform
@@ -42,7 +44,7 @@ func (e OAuthExtraction) Transform() ([]Output, error) {
 func (e OAuthExtraction) buildManifestOutput() (Output, error) {
 	var ocp4Cluster Cluster
 
-	oauthResources, err := oauth.Translate(e.IdentityProviders, e.TokenConfig)
+	oauthResources, err := oauth.Translate(e.IdentityProviders, e.TokenConfig, e.Templates)
 	if err != nil {
 		return nil, errors.New("Unable to generate OAuth CRD")
 	}
@@ -274,6 +276,12 @@ func (e OAuthTransform) Extract() (Extraction, error) {
 	extraction.TokenConfig = oauth.TokenConfig{
 		AuthorizeTokenMaxAgeSeconds: tokenConfig.AuthorizeTokenMaxAgeSeconds,
 		AccessTokenMaxAgeSeconds:    tokenConfig.AccessTokenMaxAgeSeconds,
+	}
+
+	// Get templates
+	templates := masterConfig.OAuthConfig.Templates
+	if templates != nil {
+		extraction.Templates = *templates
 	}
 
 	return extraction, nil
