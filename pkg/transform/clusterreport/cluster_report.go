@@ -8,6 +8,8 @@ import (
 	"github.com/fusor/cpma/pkg/api"
 	"github.com/fusor/cpma/pkg/env"
 	"github.com/sirupsen/logrus"
+	k8sapicore "k8s.io/api/core/v1"
+	k8sapistorage "k8s.io/api/storage/v1"
 )
 
 // ClusterReport represents json report of k8s resources
@@ -40,32 +42,27 @@ type StorageClass struct {
 	Provisioner string `json:"provisioner"`
 }
 
-// Start collecting data about OCP3 resources
-func Start() error {
+// Report collecting data about OCP3 resources
+func Report(apiResources api.APIResources) (*ClusterReport, error) {
 	clusterReport := &ClusterReport{}
 
-	if err := clusterReport.reportNamespaces(); err != nil {
-		return err
+	if err := clusterReport.reportNamespaces(apiResources.NamespaceList); err != nil {
+		return nil, err
 	}
 
-	if err := clusterReport.reportPVs(); err != nil {
-		return err
+	if err := clusterReport.reportPVs(apiResources.PersistentVolumeList); err != nil {
+		return nil, err
 	}
 
-	if err := clusterReport.dumpToJSON(); err != nil {
-		return err
+	if err := clusterReport.reportStorageClasses(apiResources.StorageClassList); err != nil {
+		return nil, err
 	}
 
-	return nil
+	return clusterReport, nil
 }
 
-func (cluserReport *ClusterReport) reportNamespaces() error {
+func (cluserReport *ClusterReport) reportNamespaces(namespacesList *k8sapicore.NamespaceList) error {
 	logrus.Debug("ClusterReport::ReportNamespaces")
-	namespacesList, err := api.ListNamespaces()
-	if err != nil {
-		return err
-	}
-
 	// get namespaces names as a slice
 	namespacesNames := make([]string, 0, len(namespacesList.Items))
 	for _, namespace := range namespacesList.Items {
@@ -102,13 +99,8 @@ func reportPods(namespaceName string, reportedNamespace *Namespace) error {
 	return nil
 }
 
-func (cluserReport *ClusterReport) reportPVs() error {
+func (cluserReport *ClusterReport) reportPVs(pvList *k8sapicore.PersistentVolumeList) error {
 	logrus.Debug("ClusterReport::ReportPVs")
-	pvList, err := api.ListPVs()
-	if err != nil {
-		return err
-	}
-
 	// Go through all PV and save required information to report
 	for _, pv := range pvList.Items {
 		reportedPV := &PV{
@@ -122,13 +114,8 @@ func (cluserReport *ClusterReport) reportPVs() error {
 	return nil
 }
 
-func (cluserReport *ClusterReport) reportStorageClasses() error {
+func (cluserReport *ClusterReport) reportStorageClasses(storageClassList *k8sapistorage.StorageClassList) error {
 	logrus.Debug("ClusterReport::ReportStorageClasses")
-	storageClassList, err := api.ListStorageClasses()
-	if err != nil {
-		return err
-	}
-
 	// Go through all storage classes and save required information to report
 	for _, storageClass := range storageClassList.Items {
 		reportedStorageClass := &StorageClass{
@@ -155,5 +142,14 @@ func (cluserReport *ClusterReport) dumpToJSON() error {
 	}
 
 	logrus.Debugf("Cluster report added to %s", jsonFile)
+	return nil
+}
+
+func (cluserReport ClusterReport) Flush() error {
+	err := cluserReport.dumpToJSON()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

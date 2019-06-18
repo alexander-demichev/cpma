@@ -6,6 +6,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type APIResources struct {
+	NamespaceList        *k8sapicore.NamespaceList
+	PodList              *k8sapicore.PodList
+	PersistentVolumeList *k8sapicore.PersistentVolumeList
+	NodeList             *k8sapicore.NodeList
+	StorageClassList     *k8sapistorage.StorageClassList
+}
+
 var listOptions metav1.ListOptions
 
 // ListNamespaces list all namespaces, wrapper around client-go
