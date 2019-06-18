@@ -8,10 +8,10 @@ import (
 
 type APIResources struct {
 	NamespaceList        *k8sapicore.NamespaceList
-	PodList              *k8sapicore.PodList
 	PersistentVolumeList *k8sapicore.PersistentVolumeList
 	NodeList             *k8sapicore.NodeList
 	StorageClassList     *k8sapistorage.StorageClassList
+		NamespacePods        map[string]*k8sapicore.PodList
 }
 
 var listOptions metav1.ListOptions

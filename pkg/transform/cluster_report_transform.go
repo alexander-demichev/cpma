@@ -12,6 +12,7 @@ type ClusterReportExtraction struct {
 	NamespaceList        *k8sapicore.NamespaceList
 	PersistentVolumeList *k8sapicore.PersistentVolumeList
 	StorageClassList     *k8sapistorage.StorageClassList
+	NamespacePods        map[string]*k8sapicore.PodList
 }
 
 // ClusterReportTransform is an API specific transform
@@ -24,6 +25,7 @@ func (e ClusterReportExtraction) Transform() ([]Output, error) {
 		NamespaceList:        e.NamespaceList,
 		PersistentVolumeList: e.PersistentVolumeList,
 		StorageClassList:     e.StorageClassList,
+		NamespacePods:        e.NamespacePods,
 	})
 
 	if err != nil {
@@ -48,6 +50,18 @@ func (e ClusterReportTransform) Extract() (Extraction, error) {
 		return nil, err
 	}
 	extraction.NamespaceList = namespacesList
+
+	// Fetch all pods and map them to namespaces
+	namespacePods := make(map[string]*k8sapicore.PodList)
+	for _, namespace := range namespacesList.Items {
+		podsList, err := api.ListPods(namespace.Name)
+		if err != nil {
+			return nil, err
+		}
+		namespacePods[namespace.Name] = podsList
+	}
+
+	extraction.NamespacePods = namespacePods
 
 	pvList, err := api.ListPVs()
 	if err != nil {

@@ -8,8 +8,6 @@ import (
 	"github.com/fusor/cpma/pkg/api"
 	"github.com/fusor/cpma/pkg/env"
 	"github.com/sirupsen/logrus"
-	k8sapicore "k8s.io/api/core/v1"
-	k8sapistorage "k8s.io/api/storage/v1"
 )
 
 // ClusterReport represents json report of k8s resources
@@ -46,47 +44,33 @@ type StorageClass struct {
 func Report(apiResources api.APIResources) (*ClusterReport, error) {
 	clusterReport := &ClusterReport{}
 
-	if err := clusterReport.reportNamespaces(apiResources.NamespaceList); err != nil {
-		return nil, err
-	}
+	clusterReport.reportNamespaces(apiResources)
 
-	if err := clusterReport.reportPVs(apiResources.PersistentVolumeList); err != nil {
-		return nil, err
-	}
+	clusterReport.reportPVs(apiResources)
 
-	if err := clusterReport.reportStorageClasses(apiResources.StorageClassList); err != nil {
-		return nil, err
-	}
+	clusterReport.reportStorageClasses(apiResources)
 
 	return clusterReport, nil
 }
 
-func (cluserReport *ClusterReport) reportNamespaces(namespacesList *k8sapicore.NamespaceList) error {
+func (cluserReport *ClusterReport) reportNamespaces(apiResources api.APIResources) {
 	logrus.Debug("ClusterReport::ReportNamespaces")
-	// get namespaces names as a slice
-	namespacesNames := make([]string, 0, len(namespacesList.Items))
-	for _, namespace := range namespacesList.Items {
-		namespacesNames = append(namespacesNames, namespace.Name)
-	}
+	namespaceList := apiResources.NamespaceList
 
 	// Go through all required namespace resources and report them
-	for _, namespaceName := range namespacesNames {
+	for _, namespace := range namespaceList.Items {
 		reportedNamespace := Namespace{
-			Name: namespaceName,
+			Name: namespace.Name,
 		}
-		reportPods(namespaceName, &reportedNamespace)
+
+		reportPods(&reportedNamespace, apiResources)
 
 		cluserReport.Namespaces = append(cluserReport.Namespaces, reportedNamespace)
 	}
-
-	return nil
 }
 
-func reportPods(namespaceName string, reportedNamespace *Namespace) error {
-	podsList, err := api.ListPods(namespaceName)
-	if err != nil {
-		return err
-	}
+func reportPods(reportedNamespace *Namespace, apiResources api.APIResources) {
+	podsList := apiResources.NamespacePods[reportedNamespace.Name]
 
 	for _, pod := range podsList.Items {
 		reportedPod := &Pod{
@@ -95,12 +79,11 @@ func reportPods(namespaceName string, reportedNamespace *Namespace) error {
 
 		reportedNamespace.Pods = append(reportedNamespace.Pods, *reportedPod)
 	}
-
-	return nil
 }
 
-func (cluserReport *ClusterReport) reportPVs(pvList *k8sapicore.PersistentVolumeList) error {
+func (cluserReport *ClusterReport) reportPVs(apiResources api.APIResources) {
 	logrus.Debug("ClusterReport::ReportPVs")
+	pvList := apiResources.PersistentVolumeList
 	// Go through all PV and save required information to report
 	for _, pv := range pvList.Items {
 		reportedPV := &PV{
@@ -110,13 +93,12 @@ func (cluserReport *ClusterReport) reportPVs(pvList *k8sapicore.PersistentVolume
 
 		cluserReport.PVs = append(cluserReport.PVs, *reportedPV)
 	}
-
-	return nil
 }
 
-func (cluserReport *ClusterReport) reportStorageClasses(storageClassList *k8sapistorage.StorageClassList) error {
+func (cluserReport *ClusterReport) reportStorageClasses(apiResources api.APIResources) {
 	logrus.Debug("ClusterReport::ReportStorageClasses")
 	// Go through all storage classes and save required information to report
+	storageClassList := apiResources.StorageClassList
 	for _, storageClass := range storageClassList.Items {
 		reportedStorageClass := &StorageClass{
 			Name:        storageClass.Name,
@@ -125,8 +107,6 @@ func (cluserReport *ClusterReport) reportStorageClasses(storageClassList *k8sapi
 
 		cluserReport.StorageClasses = append(cluserReport.StorageClasses, *reportedStorageClass)
 	}
-
-	return nil
 }
 
 func (cluserReport *ClusterReport) dumpToJSON() error {
