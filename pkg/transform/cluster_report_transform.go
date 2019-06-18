@@ -3,16 +3,11 @@ package transform
 import (
 	"github.com/fusor/cpma/pkg/api"
 	"github.com/fusor/cpma/pkg/transform/clusterreport"
-	k8sapicore "k8s.io/api/core/v1"
-	k8sapistorage "k8s.io/api/storage/v1"
 )
 
 // ClusterReportExtraction is an API specific transform
 type ClusterReportExtraction struct {
-	NamespaceList        *k8sapicore.NamespaceList
-	PersistentVolumeList *k8sapicore.PersistentVolumeList
-	StorageClassList     *k8sapistorage.StorageClassList
-	NamespacePods        map[string]*k8sapicore.PodList
+	api.APIResources
 }
 
 // ClusterReportTransform is an API specific transform
@@ -21,16 +16,18 @@ type ClusterReportTransform struct {
 
 // Transform transform
 func (e ClusterReportExtraction) Transform() ([]Output, error) {
-	output, err := clusterreport.Report(api.APIResources{
+	clusterReport, err := clusterreport.Report(api.APIResources{
 		NamespaceList:        e.NamespaceList,
 		PersistentVolumeList: e.PersistentVolumeList,
 		StorageClassList:     e.StorageClassList,
-		NamespacePods:        e.NamespacePods,
+		NamespaceMap:         e.NamespaceMap,
 	})
 
 	if err != nil {
 		return nil, err
 	}
+
+	output := ClusterOutput{clusterReport}
 
 	outputs := []Output{output}
 	return outputs, nil
@@ -51,17 +48,19 @@ func (e ClusterReportTransform) Extract() (Extraction, error) {
 	}
 	extraction.NamespaceList = namespacesList
 
-	// Fetch all pods and map them to namespaces
-	namespacePods := make(map[string]*k8sapicore.PodList)
+	// Map all namespaces to their resources
+	extraction.NamespaceMap = make(map[string]*api.NamespaceResources)
 	for _, namespace := range namespacesList.Items {
+		namespaceResources := &api.NamespaceResources{}
+
 		podsList, err := api.ListPods(namespace.Name)
 		if err != nil {
 			return nil, err
 		}
-		namespacePods[namespace.Name] = podsList
-	}
+		namespaceResources.PodList = podsList
 
-	extraction.NamespacePods = namespacePods
+		extraction.NamespaceMap[namespace.Name] = namespaceResources
+	}
 
 	pvList, err := api.ListPVs()
 	if err != nil {

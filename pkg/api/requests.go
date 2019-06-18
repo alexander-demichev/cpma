@@ -11,7 +11,11 @@ type APIResources struct {
 	PersistentVolumeList *k8sapicore.PersistentVolumeList
 	NodeList             *k8sapicore.NodeList
 	StorageClassList     *k8sapistorage.StorageClassList
-		NamespacePods        map[string]*k8sapicore.PodList
+	NamespaceMap         map[string]*NamespaceResources
+}
+
+type NamespaceResources struct {
+	PodList *k8sapicore.PodList
 }
 
 var listOptions metav1.ListOptions

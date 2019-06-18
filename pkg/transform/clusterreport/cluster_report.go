@@ -1,13 +1,9 @@
 package clusterreport
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"path/filepath"
-
 	"github.com/fusor/cpma/pkg/api"
-	"github.com/fusor/cpma/pkg/env"
 	"github.com/sirupsen/logrus"
+	k8sapicore "k8s.io/api/core/v1"
 )
 
 // ClusterReport represents json report of k8s resources
@@ -55,24 +51,21 @@ func Report(apiResources api.APIResources) (*ClusterReport, error) {
 
 func (cluserReport *ClusterReport) reportNamespaces(apiResources api.APIResources) {
 	logrus.Debug("ClusterReport::ReportNamespaces")
-	namespaceList := apiResources.NamespaceList
 
 	// Go through all required namespace resources and report them
-	for _, namespace := range namespaceList.Items {
+	for namespaceName, resources := range apiResources.NamespaceMap {
 		reportedNamespace := Namespace{
-			Name: namespace.Name,
+			Name: namespaceName,
 		}
 
-		reportPods(&reportedNamespace, apiResources)
+		reportPods(&reportedNamespace, resources.PodList)
 
 		cluserReport.Namespaces = append(cluserReport.Namespaces, reportedNamespace)
 	}
 }
 
-func reportPods(reportedNamespace *Namespace, apiResources api.APIResources) {
-	podsList := apiResources.NamespacePods[reportedNamespace.Name]
-
-	for _, pod := range podsList.Items {
+func reportPods(reportedNamespace *Namespace, podList *k8sapicore.PodList) {
+	for _, pod := range podList.Items {
 		reportedPod := &Pod{
 			Name: pod.Name,
 		}
@@ -107,29 +100,4 @@ func (cluserReport *ClusterReport) reportStorageClasses(apiResources api.APIReso
 
 		cluserReport.StorageClasses = append(cluserReport.StorageClasses, *reportedStorageClass)
 	}
-}
-
-func (cluserReport *ClusterReport) dumpToJSON() error {
-	jsonFile := filepath.Join(env.Config().GetString("OutputDir"), "cluster-report.json")
-
-	file, err := json.MarshalIndent(&cluserReport, "", " ")
-	if err != nil {
-		return err
-	}
-
-	if err = ioutil.WriteFile(jsonFile, file, 0644); err != nil {
-		return err
-	}
-
-	logrus.Debugf("Cluster report added to %s", jsonFile)
-	return nil
-}
-
-func (cluserReport ClusterReport) Flush() error {
-	err := cluserReport.dumpToJSON()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
